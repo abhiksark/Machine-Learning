@@ -1,8 +1,9 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Spyder Editor
+Created on Wed Jul  5 18:05:45 2017
 
-This is a temporary script file.
+@author: abhik
 """
 
 import numpy as np
@@ -26,37 +27,53 @@ train_data.drop(['Unnamed: 0'], inplace=True, axis=1)
 ID.drop(['Unnamed: 0'], inplace=True, axis=1)
 
 
-#checking target classes 
-
-count_classes = pd.value_counts(train_data['segment'], sort = True).sort_index()
-count_classes.plot(kind = 'bar')
-plt.title("Fraud class histogram")
-plt.xlabel("Class")
-plt.ylabel("Frequency")
-
-#skewed data 
-test_other = test_data[['Family',"Crime",'Kabaddi','Boxing',"Mythology","Reality"]]
-train_other=train_data[['Family',"Crime",'Kabaddi','Boxing',"Mythology","Reality"]]
-
-
-test_data.drop(['Family',"Crime",'Kabaddi','Boxing',"Mythology","Reality"], inplace=True, axis=1)
-train_data.drop(['Family',"Crime",'Kabaddi','Boxing',"Mythology","Reality"], inplace=True, axis=1)
-
-test_data = pd.concat([test_other, test_data], axis=1, ignore_index=False)
-train_data = pd.concat([train_other, train_data], axis=1, ignore_index=False)
-
+drop_array = ['Crime',
+ 'Kabaddi',
+ 'Boxing',
+ 'Mythology',
+ 'Reality',
+ 'Travel',
+ 'Hockey',
+ 'FormulaE',
+ 'Comedy',
+ 'Teen',
+ 'NA',
+ 'Horror',
+ 'Football',
+ 'Awards',
+ 'Science',
+ 'Tennis',
+ 'Thriller',
+ 'Wildlife',
+ 'Kids',
+ 'IndiaVsSa',
+ 'Table Tennis',
+ 'Volleyball',
+ 'Athletics',
+ 'Documentary',
+ 'Swimming',
+ 'Formula1',
+ 'Badminton',
+ 'Sport',
+ '1',
+ '3',
+ '2',
+ '5',
+ '4',
+ '7',
+ '6']
+#drop array from inspection 
+test_data.drop(drop_array, inplace=True, axis=1)
+train_data.drop(drop_array, inplace=True, axis=1)
 
 heading_test = list(test_data) #heading for data frame 
 heading_train = list(train_data) 
 
 i=0
 while i in range(len(heading_test)):
-        print(heading_test[i],heading_train[i])
+        print(heading_test[i],heading_train[i+1])
         i =i+1
-
-
-
-
+        
 number_records_one = len(train_data[train_data.segment == 1])
 one_indices = np.array(train_data[train_data.segment == 1].index)
 
@@ -64,7 +81,7 @@ one_indices = np.array(train_data[train_data.segment == 1].index)
 normal_indices = train_data[train_data.segment == 0].index
 
 # Out of the indices we picked, randomly select "x" number (number_records_fraud)
-random_normal_indices = np.random.choice(normal_indices, int(number_records_one * 1.45), replace = False)
+random_normal_indices = np.random.choice(normal_indices, int(number_records_one * 1.65), replace = False)
 random_normal_indices = np.array(random_normal_indices)
 
 # Appending the 2 indices
@@ -119,13 +136,14 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.cross_validation import KFold, cross_val_score
 from sklearn.metrics import confusion_matrix,precision_recall_curve,auc,roc_auc_score,roc_curve,recall_score,classification_report 
 from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier
 
 
 def printing_Kfold_scores(x_train_data,y_train_data):
     fold = KFold(len(y_train_data),5,shuffle=False) 
 
     # Different C parameters
-    c_param_range = [0.01,0.1,1,10,100]
+    c_param_range = [50,100]
 
     results_table = pd.DataFrame(index = range(len(c_param_range),2), columns = ['C_parameter','Mean recall score'])
     results_table['C_parameter'] = c_param_range
@@ -142,7 +160,9 @@ def printing_Kfold_scores(x_train_data,y_train_data):
         for iteration, indices in enumerate(fold,start=1):
 
             # Call the logistic regression model with a certain C parameter
-            lr =LogisticRegression( C=c_param,penalty='l1',class_weight='balanced')
+            #lr =LogisticRegression( C=c_param,penalty='l1',class_weight='balanced')
+            lr = RandomForestClassifier(n_estimators = c_param, criterion = 'entropy', random_state = 0)
+
             # Use the training data to fit the model. In this case, we use the portion of the fold to train the model
             # with indices[0]. We then predict on the portion assigned as the 'test cross validation' with indices[1]
             lr.fit(x_train_data.iloc[indices[0],:],y_train_data.iloc[indices[0],:].values.ravel())
@@ -176,8 +196,10 @@ def printing_Kfold_scores(x_train_data,y_train_data):
 ###############################################################################
 best_c = printing_Kfold_scores(X_train_undersample,y_train_undersample)
 
+from xgboost import XGBClassifier
+lr= XGBClassifier()
 
-lr = LogisticRegression(C = 0.01, penalty = 'l1')
+#lr = LogisticRegression(C = 0.01, penalty = 'l1')
 y_pred_undersample_score = lr.fit(X_train_undersample,y_train_undersample.values.ravel()).decision_function(X_test_undersample.values)
 
 fpr, tpr, thresholds = roc_curve(y_test_undersample.values.ravel(),y_pred_undersample_score)
@@ -196,26 +218,10 @@ plt.show()
 
 X_submit = np.array(test_data)
 y_submit = lr.predict_proba(X_submit)
-y_submit[:,1] =  y_submit[:,1] > 0.38
+y_submit[:,1] =  y_submit[:,1] > 0.25
 columns = ['segment']
 sub = pd.DataFrame(data=y_submit[:,1], columns=columns)
 sub['ID'] = ID
 sub = sub[['ID','segment']]
 sub.to_csv("sub_hot.csv", index=False)
 
-new = lr.coef_
-indexes =[]
-i=0
-len(new[0])
-while i in range(len(new[0])):
-    if new[0][i] == 0.00:
-        indexes.append(i)
-    i=i+1
-    
-drop_array = [ heading_test[i] for i in indexes ]
-
-test_data.drop(drop_array, inplace=True, axis=1)
-train_data.drop(drop_array, inplace=True, axis=1)
-
-
-###############################################################################
